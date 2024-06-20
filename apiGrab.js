@@ -23,7 +23,7 @@ let topContribCount = 0;
 
 //todo
 //add some metric for recency on contrib
-//^might be calculated into like linux time or whatever and then check if greater than x
+//^this is very easy to do through the rest api that checks edits for a page, not for individual contributors tho
 //grab all contributions in terms of both number and size, add up, display for category
 //as a bonus feature, display top contributed page
 //also display total users contributed (unique users) and maybe top unique user page
