@@ -159,5 +159,6 @@ document.getElementById("category").addEventListener("keypress", function(event)
       setLinkToInput();
     }
 });
-
-if (document.getElementById("category").value!="") setLinkToInput(); //if category put in from url, go
+window.onload = function() {
+    if (document.getElementById("category").value!="") setLinkToInput(); //if category put in from url, go
+}
