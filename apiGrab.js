@@ -41,7 +41,7 @@ let topContribCount = 0;
 //turn into object with functions to wrap (probably will do this at end)
 //list for users and pages (maybe like top users 10, show all button if over 10 total?)
 //push down old data, compare?
-//start date end date and predetermined buttons
+//start date end date and predetermined buttons 1month 3month etc
 //check for unique users in a timeframe
 //fix subpages in edit count DONE
 //fix href DONE
@@ -160,4 +160,4 @@ document.getElementById("category").addEventListener("keypress", function(event)
     }
 });
 
-if (document.getElementById("category").innerText!="") setLinkToInput(); //if category put in from url, go
+if (document.getElementById("category").value!="") setLinkToInput(); //if category put in from url, go
