@@ -1,0 +1,33 @@
+.maingrid {
+    display: grid;
+    border: 1px solid darkgray;
+    display: grid;
+    grid-template-columns: 50% 50%;
+    grid-auto-rows: 45vh 45vh;
+}
+
+@media ( max-width: 750px ) { /* mobile view */
+    .maingrid {
+      grid-template-columns: 1fr;
+      grid-template-areas: " item1 "
+                           " item3 "
+                           " item2 "  
+    }
+  }
+  
+.section {
+    border: 1px solid darkslategray;
+    text-align: center;
+    padding-top: 10px;
+}
+
+.infolist {
+    max-height: 35vh;
+    overflow: auto;
+    float:left;
+    clear:left;
+}
+
+#category {
+    text-align: center;
+}
