@@ -24,8 +24,8 @@
 .infolist {
     max-height: 35vh;
     overflow: auto;
-    float:left;
-    clear:left;
+    /* float:left;
+    clear:left; */
 }
 
 #category {

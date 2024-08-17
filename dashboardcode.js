@@ -5,25 +5,16 @@ let currentCat = "";
 var continuing = false;
 let continueString = "";
 var siteArray = [];
-// let timeFrame = 0; // ms back determined by buttons
+var userArray = [];
 
 let apiLink = "";
 let proxy = "https://cors-anywhere-2mlo.onrender.com/";
 
 let totalContribs = 0;
-let topContribPage = "";
-let topContribCount = 0;
 let totalUnique = 0;
 let allUnique = [];
 let topUserPage = "";
 let topUserPageCount = 0;
-
-let totalContribs_old = 0;
-let topContribPage_old = "";
-let topContribCount_old = 0;
-let totalUnique_old = 0; 
-let topUserPage_old = "";
-let topUserPageCount_old = 0;
 
 var hashParams = window.location.hash.substring(1).split('&'); // substr(1) to remove the `#`
 for(var i = 0; i < hashParams.length; i++){
@@ -61,7 +52,7 @@ function fetchWikiExtract(catGrab){ //builds api link with category as input
 //start date end date and predetermined buttons 1month 3month etc CURRENTLY CANT DO? to from parameters only work with revision ids
 //check for unique users in a timeframe (most likely not doable?)
 //fix href AGAIN
-async function setDisplay(){
+async function setDisplayTop(){
     //console.log(apiLink);
     fetch(proxy + apiLink).then(response => response.json()).then(//get data for category
         data => {
@@ -84,47 +75,74 @@ async function setDisplay(){
                         for (let page in allPages) {
                             // let tempUnique = 0
                             let currentTitle = allPages[page].title
-                            // let contributors = allPages[page].contributors;
-                            // if(contributors.length > 0 && contributors[0].userid==120901) break; //translation (only) check
-                            // for(j = 0; j < contributors.length; j++){
-                            //     let currentID = contributors[j].userid;
-                            //     // if(botIDs.indexOf(currentID) != -1) continue; //check not bot
-                            //     tempUnique++; //add to unique user temp count if not bot
-                            //     if(allUnique.indexOf(currentID) == -1){ //if current user not yet recorded
-                            //         allUnique.push(currentID);
-                            //         totalUnique++;
-                            //     }
-                            // }
-                            // if (tempUnique > topUserPageCount) { //if this page is highest users
-                            //     topUserPageCount = tempUnique; //save num
-                            //     topUserPage = currentTitle; //save title
-                            // }
+                            let contributors = allPages[page].contributors;
+                            if (contributors!=null) {
+                                for(j = 0; j < contributors.length; j++){
+                                    let currentID = contributors[j].userid;
+                                    if(allUnique.indexOf(currentID) == -1){ //if current user not yet recorded
+                                        let currentName = contributors[j].name;
+                                        userArray.push([currentName, 1, currentID]);
+                                        allUnique.push(currentID); //more efficient than scanning complex array every time
+                                    } else {
+                                        userArray[indexOfUser(userArray, currentID)][1]++; //add 1 to count part of user data
+                                    }
+                                }
+                            }                            
                             //needs to omit edits from bots
                             setEdits(currentTitle);
+                            postUsers();
                         }; 
                         // document.getElementById("totalUsers").innerText = anime.desc;
                     }).catch(error => {console.error(error);})
                 //get data for contribs
             }   
         }).then(function(){ //recur to continue
-            if(continuing) setDisplay();
-            // if(!continuing) postEdits();
-        }).then(function(){
-            postEdits(); //why doesn't this work lol
+            if(continuing) setDisplayTop();
         })
         .catch(error => {console.error(error);})
 }
 
+function indexOfUser(arr, id){
+    console.log(arr);
+    for(let index = 0; index < arr.length; index++){
+        console.log(arr[index]);
+        console.log(arr[index][2]);
+        if (arr[index][2] == id) return index;
+    }
+    return -1;
+}
+
+function postUsers(){ //takes all and puts onto site
+    userArray.sort(function(a,b) {
+        return a[1]-b[1]
+    });
+    userArray.reverse();
+    let container = document.querySelector('#userlist')
+    container.innerHTML = ''; //in case of refresh
+    userArray.forEach(e => {
+        let newListObject = document.createElement("a");
+        let newListObject2 = document.createElement("a");
+        let newText = document.createTextNode(e[0]);
+        let newText2 = document.createTextNode(': ' + e[1]);
+        newListObject.appendChild(newText);
+        newListObject2.appendChild(newText2);
+        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
+        container.appendChild(newListObject);
+        container.appendChild(newListObject2);
+        container.appendChild(document.createElement("br"));
+    });
+}
+
 async function setEdits(page){ //gets page edits and pushes to array of them
     let json = await getEdits(page);
-    if(json.count>0)totalContribs+=json.count;
+    if(json.count>0)totalContribs+=json.count; //keeping for now in case we want it
     let tempPage = page;
     let tempCount = json.count;
     siteArray.push([tempPage, tempCount]) //have to add href to each child with wikiSite + encodeURI(page or whatever nested page title);
     postEdits(); //this feels disgusting but ya gotta do it
 }
 
-async function getEdits(page){ //gets data for page edits
+async function getEdits(page){ //gets data for page edits (bots can't be filtered out according to documentation, could potentially do some subtraction by getting bot edits too)
     let link = proxy + wikiSite + "w/rest.php/v1/page/" + encodeURIComponent(page) +"/history/counts/edits"
     try {
         var response = await fetch(link, {
@@ -138,7 +156,7 @@ async function getEdits(page){ //gets data for page edits
     }
 }
 
-function postEdits(){ //takes all and puts onto site, probably doesnt work because will finish before full import of data? 
+function postEdits(){ //takes all and puts onto site
     siteArray.sort(function(a,b) {
         return a[1]-b[1]
     });
@@ -169,13 +187,19 @@ function genIDBasedAPILinkContributors(id){ //finds all contributors in a page
 }
 
 async function setLinkToInput(){ //sets apiLink to inputted category, then dumps info on page
-    totalContribs = 0;
-    topContribPage = "";
-    topContribCount = 0;
+    resetVals();
     // currentCat = document.getElementById("category").value;
     apiLink = fetchWikiExtract(currentCat);
     continuing = true; //set up to help stop double clicks\
-    setDisplay(apiLink)
+    setDisplayTop(apiLink)
+}
+
+function resetVals(){
+    totalContribs = 0;
+    totalUnique = 0;
+    allUnique = [];
+    userArray = [];
+    siteArray = [];
 }
 
 window.onload = function() {
