@@ -6,8 +6,12 @@ var continuing = false;
 let continueString = "";
 var siteArray = [];
 var userArray = [];
+var minorArray = []; //minor edit array
+var recentArray = [];
+const revisionCount = 10000;
+var mostRecentRevision = 0;
 
-let apiLink = "";
+let mainApiLink = "";
 let proxy = "https://cors-anywhere-2mlo.onrender.com/";
 
 let totalContribs = 0;
@@ -33,6 +37,8 @@ function fetchWikiExtract(catGrab){ //builds api link with category as input
     + '&gcmtitle=Category:'
     + catGrab
     + '&prop=id'
+    + '&prop=revisions'
+    + '&pcexcludegroup=bot'
     + "&format=json"
     + '&origin=*'
     if(continuing) wikiParams += continueString += gsmContinueString;
@@ -53,15 +59,15 @@ function fetchWikiExtract(catGrab){ //builds api link with category as input
 //check for unique users in a timeframe (most likely not doable?)
 //fix href AGAIN
 async function setDisplayTop(){
-    //console.log(apiLink);
-    fetch(proxy + apiLink).then(response => response.json()).then(//get data for category
+    //console.log(mainApiLink);
+    fetch(proxy + mainApiLink).then(response => response.json()).then(//get data for category
         data => {
             console.log(data);
             if (data.continue != null) { //this sets up continue at end of promise chain
                 continueString = "&continue=" + data.continue.continue;
                 gsmContinueString = "&gcmcontinue=" + data.continue.gcmcontinue;
                 continuing = true;
-                apiLink = fetchWikiExtract(currentCat);
+                mainApiLink = fetchWikiExtract(currentCat);
             } else {
                 continuing = false
             }
@@ -87,21 +93,78 @@ async function setDisplayTop(){
                                         userArray[indexOfUser(userArray, currentID)][1]++; //add 1 to count part of user data
                                     }
                                 }
-                            }                            
+                            }   
                             //needs to omit edits from bots
                             setEdits(currentTitle);
+                            setEditsRev(currentTitle, revisionCount);
                             postUsers();
+                            postMinors();
                         }; 
                         // document.getElementById("totalUsers").innerText = anime.desc;
                     }).catch(error => {console.error(error);})
-                //get data for contribs
             }   
+            //get data for revisions, currently very cheap but janky
+            let catPages = data.query.pages;
+            console.log(catPages);
+            for (let page in catPages){ 
+                let revs = catPages[page].revisions;
+                let currentLastRev = revs[0].revid;
+                let currentLastRevUser = revs[0].user;
+                console.log(currentLastRevUser);
+                let currentTitle = catPages[page].title;
+                if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev]);      
+            }
         }).then(function(){ //recur to continue
             if(continuing) setDisplayTop();
         })
         .catch(error => {console.error(error);})
 }
 
+function setCatName(){
+    document.getElementById('category').textContent = "Category: " + currentCat;
+}
+
+function postMinors(){ //...
+    minorArray.sort(function(a,b) {
+        return a[2]-b[2]
+    });
+    minorArray.reverse();
+    let container = document.querySelector('#minorlist')
+    container.innerHTML = ''; //in case of refresh
+    minorArray.forEach(e => {
+        let newListObject = document.createElement("a");
+        let newListObject2 = document.createElement("a");
+        let newText = document.createTextNode(e[0]);
+        let newText2 = document.createTextNode(': ' + e[1]);
+        newListObject.appendChild(newText);
+        newListObject2.appendChild(newText2);
+        newListObject.href = wikiSite + encodeURI(e[0]);//
+        container.appendChild(newListObject);
+        container.appendChild(newListObject2);
+        container.appendChild(document.createElement("br"));
+    });
+}
+
+function postMajors(){ 
+    majorArray.sort(function(a,b) {
+        return a[1]-b[1]
+    });
+    majorArray.reverse();
+    let container = document.querySelector('#majorlist')
+    container.innerHTML = ''; //in case of refresh
+    majorArray.forEach(e => {
+        let newListObject = document.createElement("a");
+        let newListObject2 = document.createElement("a");
+        let newText = document.createTextNode(e[0]);
+        let newText2 = document.createTextNode(': ' + e[1]);
+        newListObject.appendChild(newText);
+        newListObject2.appendChild(newText2);
+        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);//
+        container.appendChild(newListObject);
+        container.appendChild(newListObject2);
+        container.appendChild(document.createElement("br"));
+    });   
+}
 function indexOfUser(arr, id){
     console.log(arr);
     for(let index = 0; index < arr.length; index++){
@@ -142,6 +205,14 @@ async function setEdits(page){ //gets page edits and pushes to array of them
     postEdits(); //this feels disgusting but ya gotta do it
 }
 
+async function setEditsRev(page, revs){ //gets page edits and pushes to array of them
+    let json = await getEditsRev(page, revs);
+    let tempPage = page;
+    let tempCount = json.count;
+    recentArray.push([tempPage, tempCount]) //have to add href to each child with wikiSite + encodeURI(page or whatever nested page title);
+    postEditsRev(); 
+}
+
 async function getEdits(page){ //gets data for page edits (bots can't be filtered out according to documentation, could potentially do some subtraction by getting bot edits too)
     let link = proxy + wikiSite + "w/rest.php/v1/page/" + encodeURIComponent(page) +"/history/counts/edits"
     try {
@@ -154,6 +225,63 @@ async function getEdits(page){ //gets data for page edits (bots can't be filtere
         console.error("Error:", error);
         throw error;
     }
+}
+
+async function setLastRevisionID() {
+    let wikiParams = 'w/api.php?action=query'
+    + '&list=recentchanges'
+    + '&rcprop=title|ids|sizes|flags|user'
+    + '&rclimit=1'
+    + "&format=json"
+    + '&origin=*'
+    let link = proxy + wikiSite + wikiParams;
+    fetch(link).then(response => response.json()).then(//get data for category
+        data => {
+            console.log(data)
+            let recentChanges = data.query.recentchanges;
+            for (let change in recentChanges){ 
+                console.log("Last revision id: " + recentChanges[change].revid);      
+                mostRecentRevision = (recentChanges[change].revid);      
+                return;
+            }
+        }).catch(error => {console.error(error);})
+}
+
+async function getEditsRev(page, revs){ //count for past x revisions
+    let link = proxy + wikiSite + "w/rest.php/v1/page/" + encodeURIComponent(page) +"/history/counts/edits"
+    link += ("?from=" + (mostRecentRevision-revs) + "&to=" + (mostRecentRevision))
+    console.log(link);
+    try {
+        var response = await fetch(link, {
+            method: "GET"
+        });
+        var data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error:", error);
+        throw error;
+    }
+}
+
+function postEditsRev(){
+    recentArray.sort(function(a,b) {
+        return a[1]-b[1]
+    });
+    recentArray.reverse();
+    let container = document.querySelector('#recentlist')
+    container.innerHTML = ''; //in case of refresh
+    recentArray.forEach(e => {
+        let newListObject = document.createElement("a");
+        let newListObject2 = document.createElement("a");
+        let newText = document.createTextNode(e[0]);
+        let newText2 = document.createTextNode(': ' + e[1]);
+        newListObject.appendChild(newText);
+        newListObject2.appendChild(newText2);
+        newListObject.href = wikiSite + encodeURI(e[0]);
+        container.appendChild(newListObject);
+        container.appendChild(newListObject2);
+        container.appendChild(document.createElement("br"));
+    });
 }
 
 function postEdits(){ //takes all and puts onto site
@@ -186,12 +314,14 @@ function genIDBasedAPILinkContributors(id){ //finds all contributors in a page
     return proxy + wikiSite + "w/api.php?action=query&prop=contributors&pageids=" + id + "&format=json"
 }
 
-async function setLinkToInput(){ //sets apiLink to inputted category, then dumps info on page
+async function setLinkToInput(){ //sets mainApiLink to inputted category, then dumps info on page
     resetVals();
+    setCatName();
+    setLastRevisionID();
     // currentCat = document.getElementById("category").value;
-    apiLink = fetchWikiExtract(currentCat);
+    mainApiLink = fetchWikiExtract(currentCat);
     continuing = true; //set up to help stop double clicks\
-    setDisplayTop(apiLink)
+    setDisplayTop(mainApiLink)
 }
 
 function resetVals(){
