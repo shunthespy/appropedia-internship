@@ -23,10 +23,7 @@ let topUserPageCount = 0;
 var hashParams = window.location.hash.substring(1).split('&'); // substr(1) to remove the `#`
 for(var i = 0; i < hashParams.length; i++){
     if(hashParams.length == 0) break;
-    var p = hashParams[i].split('=');
-    
-    // if(p!=null) document.getElementById(p[0]).value = decodeURIComponent(p[1]);
-    if(p!=null) currentCat = decodeURIComponent(p[1]);
+    currentCat = decodeURIComponent(hashParams[0]);
 }
 
 function fetchWikiExtract(catGrab){ //builds api link with category as input
@@ -121,7 +118,9 @@ async function setDisplayTop(){
 }
 
 function setCatName(){
-    document.getElementById('category').textContent = "Category: " + currentCat;
+    document.getElementById('category').textContent = "Dashboard for project " + currentCat;
+    document.getElementById('subhead').textContent = "(based on Category:" + currentCat  + ")";
+    document.getElementById('subhead').href = "https://www.appropedia.org/Category:" + currentCat;
 }
 
 function postMinors(){ //...
