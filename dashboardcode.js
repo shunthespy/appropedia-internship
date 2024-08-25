@@ -8,6 +8,7 @@ var siteArray = [];
 var userArray = [];
 var minorArray = []; //minor edit array
 var recentArray = [];
+var recentUserArray = [];
 const revisionCount = 10000;
 var mostRecentRevision = 0;
 
@@ -17,6 +18,7 @@ let proxy = "https://cors-anywhere-2mlo.onrender.com/";
 let totalContribs = 0;
 let totalUnique = 0;
 let allUnique = [];
+let recentUnique = [];
 let topUserPage = "";
 let topUserPageCount = 0;
 
@@ -42,19 +44,10 @@ function fetchWikiExtract(catGrab){ //builds api link with category as input
     return wikiSite + wikiParams;
 }
 
-//todo super current
-//make top scoring edit page list with titles and link :)
-//remove push down code
-
-//add some metric for recency on contrib
-//^found out this is not doable, at least not from anything i've seen (unless you call each user that has edited and cross-reference for each edit?)
-
 //remove bot edits (currently cant) (can now maybe)
 //turn into object with functions to wrap (probably will do this at end)
 //list for users and pages (maybe like top users 10, show all button if over 10 total?)
-//start date end date and predetermined buttons 1month 3month etc CURRENTLY CANT DO? to from parameters only work with revision ids
-//check for unique users in a timeframe (most likely not doable?)
-//fix href AGAIN
+
 async function setDisplayTop(){
     //console.log(mainApiLink);
     fetch(proxy + mainApiLink).then(response => response.json()).then(//get data for category
@@ -93,9 +86,10 @@ async function setDisplayTop(){
                             }   
                             //needs to omit edits from bots
                             setEdits(currentTitle);
-                            setEditsRev(currentTitle, revisionCount);
+                            // setEditsRev(currentTitle, revisionCount);
                             postUsers();
                             postMinors();
+                            postRecentUsers();
                         }; 
                         // document.getElementById("totalUsers").innerText = anime.desc;
                     }).catch(error => {console.error(error);})
@@ -107,9 +101,17 @@ async function setDisplayTop(){
                 let revs = catPages[page].revisions;
                 let currentLastRev = revs[0].revid;
                 let currentLastRevUser = revs[0].user;
+                let currentTimestamp = revs[0].timestamp;
                 console.log(currentLastRevUser);
                 let currentTitle = catPages[page].title;
-                if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev]);      
+                if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev, currentTimestamp]);      
+                if(recentUnique.indexOf(currentLastRevUser) != -1) {
+                    mostRecentEditCheck(currentLastRevUser, currentLastRev, currentTimestamp); //check recency compared to logged revid, then push
+                } else { // if not already listed as a recent user
+                    console.log("TESTING");
+                    recentUserArray.push([currentLastRevUser, currentLastRev, currentTimestamp]) //push into array no verification
+                    recentUnique.push(currentLastRevUser);
+                }
             }
         }).then(function(){ //recur to continue
             if(continuing) setDisplayTop();
@@ -123,7 +125,7 @@ function setCatName(){
     document.getElementById('subhead').href = "https://www.appropedia.org/Category:" + currentCat;
 }
 
-function postMinors(){ //...
+function postMinors(){ //minors being any revision to a page, no filtering for logs
     minorArray.sort(function(a,b) {
         return a[2]-b[2]
     });
@@ -144,26 +146,27 @@ function postMinors(){ //...
     });
 }
 
-function postMajors(){ 
-    majorArray.sort(function(a,b) {
+function postRecentUsers(){ //recent users and their most recent edit, shallow search based off of recent revisions to pages found above
+    recentUserArray.sort(function(a,b) {
         return a[1]-b[1]
     });
-    majorArray.reverse();
-    let container = document.querySelector('#majorlist')
+    recentUserArray.reverse();
+    let container = document.querySelector('#recentlist')
     container.innerHTML = ''; //in case of refresh
-    majorArray.forEach(e => {
+    recentUserArray.forEach(e => {
         let newListObject = document.createElement("a");
         let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[1]);
+        let newText2 = document.createTextNode(': ' + e[2]);
         newListObject.appendChild(newText);
         newListObject2.appendChild(newText2);
-        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);//
+        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
         container.appendChild(newListObject);
         container.appendChild(newListObject2);
         container.appendChild(document.createElement("br"));
-    });   
+    });
 }
+
 function indexOfUser(arr, id){
     console.log(arr);
     for(let index = 0; index < arr.length; index++){
@@ -172,6 +175,24 @@ function indexOfUser(arr, id){
         if (arr[index][2] == id) return index;
     }
     return -1;
+}
+
+function indexOfUserRecent(arr, name){ //revisions prop doesn't give us id but rather name so we use this
+    console.log(arr);
+    for(let index = 0; index < arr.length; index++){
+        console.log(arr[index]);
+        if (arr[index][0] == name) return index;
+    }
+    return -1;
+}
+
+function mostRecentEditCheck(user, id, time){ //check if this user and its matching revision id are the most recent of that user
+    userIndex = indexOfUserRecent(recentUserArray, user);
+    let currentMostRecentID =  recentUserArray[userIndex][1];
+    if (currentMostRecentID < id) {
+        recentUserArray[userIndex][1] = id;
+        recentUserArray[userIndex][2] = time;
+    }
 }
 
 function postUsers(){ //takes all and puts onto site
@@ -226,7 +247,7 @@ async function getEdits(page){ //gets data for page edits (bots can't be filtere
     }
 }
 
-async function setLastRevisionID() {
+async function setLastRevisionID() { //may be useful for future use, keeping
     let wikiParams = 'w/api.php?action=query'
     + '&list=recentchanges'
     + '&rcprop=title|ids|sizes|flags|user'
@@ -323,7 +344,7 @@ async function setLinkToInput(){ //sets mainApiLink to inputted category, then d
     setDisplayTop(mainApiLink)
 }
 
-function resetVals(){
+function resetVals(){ //most likely don't need anymore? browsing is no longer a priority
     totalContribs = 0;
     totalUnique = 0;
     allUnique = [];
