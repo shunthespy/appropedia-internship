@@ -102,6 +102,7 @@ async function setDisplayTop(){
                 let currentLastRev = revs[0].revid;
                 let currentLastRevUser = revs[0].user;
                 let currentTimestamp = revs[0].timestamp;
+                currentTimestamp = cleanTimestamp(currentTimestamp);
                 console.log(currentLastRevUser);
                 let currentTitle = catPages[page].title;
                 if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev, currentTimestamp]);      
@@ -117,6 +118,11 @@ async function setDisplayTop(){
             if(continuing) setDisplayTop();
         })
         .catch(error => {console.error(error);})
+}
+
+function cleanTimestamp(time){
+    let newTimestamp = time.substring(0, 10) + " " + time.substring(11, 19);
+    return newTimestamp;
 }
 
 function setCatName(){
@@ -136,7 +142,7 @@ function postMinors(){ //minors being any revision to a page, no filtering for l
         let newListObject = document.createElement("a");
         let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[1]);
+        let newText2 = document.createTextNode(': ' + e[3]);
         newListObject.appendChild(newText);
         newListObject2.appendChild(newText2);
         newListObject.href = wikiSite + encodeURI(e[0]);//
