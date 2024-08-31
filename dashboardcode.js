@@ -10,6 +10,7 @@ var userArray = [];
 var minorArray = []; //minor edit array
 var recentArray = [];
 var recentUserArray = [];
+var recentUserArrayDeep = [];
 const revisionCount = 10000;
 var mostRecentRevision = 0;
 
@@ -19,6 +20,8 @@ let proxy = "https://cors-anywhere-2mlo.onrender.com/";
 let totalContribs = 0;
 let totalUnique = 0;
 let allUnique = [];
+let allUniqueStrings = [];
+let foundBots = [];
 let recentUnique = [];
 let topUserPage = "";
 let topUserPageCount = 0;
@@ -68,10 +71,9 @@ async function setDisplayTop(){
             }
             let bar = Object.keys(data.query.pages);
             for(i = 0; i < bar.length; i++){
-                //get data for contributers
+                //get data for contributors
                 fetch(genIDBasedAPILinkContributors(bar[i])).then(response => response.json()).then(//get data for page
                     data => {
-                        // console.log(data);
                         let allPages = data.query.pages;
                         for (let page in allPages) {
                             // let tempUnique = 0
@@ -84,6 +86,7 @@ async function setDisplayTop(){
                                         let currentName = contributors[j].name;
                                         userArray.push([currentName, 1, currentID]);
                                         allUnique.push(currentID); //more efficient than scanning complex array every time
+                                        allUniqueStrings.push(currentName);
                                     } else {
                                         userArray[indexOfUser(userArray, currentID)][1]++; //add 1 to count part of user data
                                     }
@@ -95,9 +98,32 @@ async function setDisplayTop(){
                             postUsers();
                             postMinors();
                             postRecentUsers();
+                            // postRecentUsersDeep();
                         }; 
-                        // document.getElementById("totalUsers").innerText = anime.desc;
                     }).catch(error => {console.error(error);})
+                    //get data for revisions
+                    fetch(genIDBasedAPILinkRevisions(bar[i])).then(response => response.json()).then(//get data for page
+                        data => {
+                            console.log(data);
+                            let allPages = data.query.pages;
+                            for (let page in allPages) { //not checking uniqueness on users in the 5 revisions
+                                // let tempUnique = 0
+                                let revisions = allPages[page].revisions;
+                                for(j = 0; j < revisions.length; j++){
+                                    let currentLastRevUser = revisions[j].user;
+                                    let currentLastRev = revisions[j].revid;
+                                    let currentTimestamp = revisions[j].timestamp;
+                                    currentTimestamp = cleanTimestamp(currentTimestamp);
+                                    if(recentUnique.indexOf(currentLastRevUser) != -1) {
+                                        mostRecentEditCheck(currentLastRevUser, currentLastRev, currentTimestamp); //check recency compared to logged revid, then push
+                                    } else { // if not already listed as a recent user
+                                        recentUserArray.push([currentLastRevUser, currentLastRev, currentTimestamp]) //push into array no verification
+                                        recentUnique.push(currentLastRevUser);
+                                    }
+                                }
+                            }   
+                            //postRecentUsersDeep();
+                        }).catch(error => {console.error(error);})
             }   
             //get data for revisions, currently very cheap but janky
             let catPages = data.query.pages;
@@ -108,16 +134,15 @@ async function setDisplayTop(){
                 let currentLastRevUser = revs[0].user;
                 let currentTimestamp = revs[0].timestamp;
                 currentTimestamp = cleanTimestamp(currentTimestamp);
-                console.log(currentLastRevUser);
+                // console.log(currentLastRevUser);
                 let currentTitle = catPages[page].title;
                 if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev, currentTimestamp]);      
-                if(recentUnique.indexOf(currentLastRevUser) != -1) {
-                    mostRecentEditCheck(currentLastRevUser, currentLastRev, currentTimestamp); //check recency compared to logged revid, then push
-                } else { // if not already listed as a recent user
-                    console.log("TESTING");
-                    recentUserArray.push([currentLastRevUser, currentLastRev, currentTimestamp]) //push into array no verification
-                    recentUnique.push(currentLastRevUser);
-                }
+                // if(recentUnique.indexOf(currentLastRevUser) != -1) { //OLD, SHALLOW recent users
+                //     mostRecentEditCheck(currentLastRevUser, currentLastRev, currentTimestamp); //check recency compared to logged revid, then push
+                // } else { // if not already listed as a recent user
+                //     recentUserArray.push([currentLastRevUser, currentLastRev, currentTimestamp]) //push into array no verification
+                //     recentUnique.push(currentLastRevUser);
+                // }
             }
         }).then(function(){ //recur to continue
             if(continuing) setDisplayTop();
@@ -129,8 +154,18 @@ async function setDisplayTop(){
 }
 
 
-function cleanTimestamp(time){
+//checks each contributor if bot, will create if needed outside of just checking from contributors
+async function checkBot(user) {
+    
+}
+
+function cleanTimestamp(time){ //both of these clean methods are slightly slower than possible but written clearer than otherwise 
     let newTimestamp = time.substring(0, 10) + " " + time.substring(11, 19);
+    return newTimestamp;
+}
+
+function cleanTimestamptoInt(time){ //this is for int comparison for deep revision checks <may be unneeded, testing>
+    let newTimestamp = time.replace(/\D/g,'');
     return newTimestamp;
 }
 
@@ -183,6 +218,30 @@ function postRecentUsers(){ //recent users and their most recent edit, shallow s
     let container = document.querySelector('#recentlist')
     container.innerHTML = ''; //in case of refresh
     recentUserArray.forEach(e => {
+        if(allUniqueStrings.indexOf(e[0]) == -1) return; //stops those not logged as contributors ALSO BLOCKs NON-LOGGED IN
+        let newListObject = document.createElement("a");
+        let newText = document.createTextNode(e[0]);
+        newListObject.appendChild(newText);
+        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
+        container.appendChild(newListObject);
+        if (showTimestamps) { //all timestamp related
+            let newListObject2 = document.createElement("a");
+            let newText2 = document.createTextNode(': ' + e[2]);
+            newListObject2.appendChild(newText2);
+            container.appendChild(newListObject2);
+        }
+        container.appendChild(document.createElement("br"));
+    });
+}
+
+function postRecentUsersDeep(){ //recent user search but deeper, last 5 revisions of page vs one, bots filtered etc.
+    recentUserArrayDeep.sort(function(a,b) {
+        return a[1]-b[1]
+    });
+    recentUserArrayDeep.reverse();
+    let container = document.querySelector('#recentlist')
+    container.innerHTML = ''; //in case of refresh
+    recentUserArrayDeep.forEach(e => {
         let newListObject = document.createElement("a");
         let newText = document.createTextNode(e[0]);
         newListObject.appendChild(newText);
@@ -199,25 +258,23 @@ function postRecentUsers(){ //recent users and their most recent edit, shallow s
 }
 
 function indexOfUser(arr, id){
-    console.log(arr);
+    // console.log(arr);
     for(let index = 0; index < arr.length; index++){
-        console.log(arr[index]);
-        console.log(arr[index][2]);
         if (arr[index][2] == id) return index;
     }
     return -1;
 }
 
 function indexOfUserRecent(arr, name){ //revisions prop doesn't give us id but rather name so we use this
-    console.log(arr);
+    // console.log(arr);
     for(let index = 0; index < arr.length; index++){
-        console.log(arr[index]);
+        // console.log(arr[index]);
         if (arr[index][0] == name) return index;
     }
     return -1;
 }
 
-function mostRecentEditCheck(user, id, time){ //check if this user and its matching revision id are the most recent of that user
+function mostRecentEditCheck(user, id, time){ //check if this user and its matching revision id are the most recent of that user (also functions for timestamp deep ver)
     userIndex = indexOfUserRecent(recentUserArray, user);
     let currentMostRecentID =  recentUserArray[userIndex][1];
     if (currentMostRecentID < id) {
@@ -247,7 +304,8 @@ function postUsers(){ //takes all and puts onto site
     });
 }
 
-async function setEdits(page){ //gets page edits and pushes to array of them
+//gets page edits and pushes to array of them
+async function setEdits(page){ 
     let json = await getEdits(page);
     if(json.count>0)totalContribs+=json.count; //keeping for now in case we want it
     let tempPage = page;
@@ -256,7 +314,8 @@ async function setEdits(page){ //gets page edits and pushes to array of them
     postEdits(); //this feels disgusting but ya gotta do it
 }
 
-async function setEditsRev(page, revs){ //gets page edits and pushes to array of them
+//gets page edits in last x revs and pushes to array of them (BROKEN)
+async function setEditsRev(page, revs){ 
     let json = await getEditsRev(page, revs);
     let tempPage = page;
     let tempCount = json.count;
@@ -264,7 +323,10 @@ async function setEditsRev(page, revs){ //gets page edits and pushes to array of
     postEditsRev(); 
 }
 
-async function getEdits(page){ //gets data for page edits (bots can't be filtered out according to documentation, could potentially do some subtraction by getting bot edits too)
+
+//gets data for page edits (bots can't be filtered out according to documentation, 
+//could potentially do some subtraction by getting bot edits too)
+async function getEdits(page){ 
     let link = proxy + wikiSite + "w/rest.php/v1/page/" + encodeURIComponent(page) +"/history/counts/edits"
     try {
         var response = await fetch(link, {
@@ -278,6 +340,7 @@ async function getEdits(page){ //gets data for page edits (bots can't be filtere
     }
 }
 
+//finds most recent revision id on site
 async function setLastRevisionID() { //may be useful for future use, keeping
     let wikiParams = 'w/api.php?action=query'
     + '&list=recentchanges'
@@ -356,13 +419,19 @@ function postEdits(){ //takes all and puts onto site
     });
 }
 
-//it appears as if bots aren't accurately labeled as such on the site
-//for example: https://www.appropedia.org/Special:UserRights/StandardWikitext_bot seems to simply be a user whereas
-//https://www.appropedia.org/Special:UserRights/Bot is labeled bot, this prevents (to my knowledge) the ability to filter from the api request
-//rather i use my own bot list to do so 
-function genIDBasedAPILinkContributors(id){ //finds all contributors in a page
+//finds all contributors in a page with pageid
+function genIDBasedAPILinkContributors(id){ 
     if (excludeBots) return proxy + wikiSite + "w/api.php?action=query&prop=contributors&pageids=" + id + "&format=json&pcexcludegroup=bot"
     return proxy + wikiSite + "w/api.php?action=query&prop=contributors&pageids=" + id + "&format=json"
+}
+
+//finds past 5 revisions on a page with pageid (for use in deep recent user search)
+function genIDBasedAPILinkRevisions(id){
+    return proxy + wikiSite + "w/api.php?action=query&prop=revisions&pageids=" + id + "&rvlimit=5&rvprop=ids|timestamp|user&format=json";
+}
+
+function genNameBasedAPILinkUserRoles(name){    
+    return proxy + wikiSite + "w/api.php?action=query&prop=revisions&pageids=" + name + "&rvlimit=5&rvprop=ids|timestamp|user&format=json";
 }
 
 async function setLinkToInput(){ //sets mainApiLink to inputted category, then dumps info on page
@@ -375,10 +444,12 @@ async function setLinkToInput(){ //sets mainApiLink to inputted category, then d
     setDisplayTop(mainApiLink)
 }
 
+//resets values to make way for new data (outdated)
 function resetVals(){ //most likely don't need anymore? browsing is no longer a priority
     totalContribs = 0;
     totalUnique = 0;
     allUnique = [];
+    foundBots = [];
     userArray = [];
     siteArray = [];
 }
