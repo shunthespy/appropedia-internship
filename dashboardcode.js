@@ -1,6 +1,7 @@
 // const botIDs = [116268, 119543, 120737, 120901]; 
 const wikiSite = "http://appropedia.org/"; //this is a temporary default and will be removed to make code more open to other sites
 let excludeBots = true; //gonna make this toggleable
+let showTimestamps = true;
 let currentCat = "";
 var continuing = false;
 let continueString = "";
@@ -23,8 +24,12 @@ let topUserPage = "";
 let topUserPageCount = 0;
 
 var hashParams = window.location.hash.substring(1).split('&'); // substr(1) to remove the `#`
+
 for(var i = 0; i < hashParams.length; i++){
-    if(hashParams.length == 0) break;
+    if(hashParams.length == 0 || hashParams[0] == "") {
+        setErrorMessage("No category inputted. Please fix url.");
+        break;
+    };
     currentCat = decodeURIComponent(hashParams[0]);
 }
 
@@ -117,18 +122,34 @@ async function setDisplayTop(){
         }).then(function(){ //recur to continue
             if(continuing) setDisplayTop();
         })
-        .catch(error => {console.error(error);})
+        .catch(error => {
+            setErrorMessage("Unknown Category or API Error");
+            console.error(error);
+        })
 }
+
 
 function cleanTimestamp(time){
     let newTimestamp = time.substring(0, 10) + " " + time.substring(11, 19);
     return newTimestamp;
 }
 
+function toggleTimestamps(){
+    showTimestamps = !showTimestamps; //flip boolean
+    postRecentUsers();
+    postMinors();
+}
+
 function setCatName(){
     document.getElementById('category').textContent = "Dashboard for project " + currentCat;
     document.getElementById('subhead').textContent = "(based on Category:" + currentCat  + ")";
     document.getElementById('subhead').href = "https://www.appropedia.org/Category:" + currentCat;
+}
+
+function setErrorMessage(msg){
+    document.getElementById('subhead').textContent = msg;
+    document.getElementById('subhead').removeAttribute('href');
+    document.getElementById('subhead').classList.add("errormessage");
 }
 
 function postMinors(){ //minors being any revision to a page, no filtering for logs
@@ -140,14 +161,16 @@ function postMinors(){ //minors being any revision to a page, no filtering for l
     container.innerHTML = ''; //in case of refresh
     minorArray.forEach(e => {
         let newListObject = document.createElement("a");
-        let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[3]);
         newListObject.appendChild(newText);
-        newListObject2.appendChild(newText2);
         newListObject.href = wikiSite + encodeURI(e[0]);//
         container.appendChild(newListObject);
-        container.appendChild(newListObject2);
+        if (showTimestamps) { //all timestamp related
+            let newListObject2 = document.createElement("a");
+            let newText2 = document.createTextNode(': ' + e[3]);
+            newListObject2.appendChild(newText2);
+            container.appendChild(newListObject2);
+        }
         container.appendChild(document.createElement("br"));
     });
 }
@@ -161,14 +184,16 @@ function postRecentUsers(){ //recent users and their most recent edit, shallow s
     container.innerHTML = ''; //in case of refresh
     recentUserArray.forEach(e => {
         let newListObject = document.createElement("a");
-        let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[2]);
         newListObject.appendChild(newText);
-        newListObject2.appendChild(newText2);
         newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
         container.appendChild(newListObject);
-        container.appendChild(newListObject2);
+        if (showTimestamps) { //all timestamp related
+            let newListObject2 = document.createElement("a");
+            let newText2 = document.createTextNode(': ' + e[2]);
+            newListObject2.appendChild(newText2);
+            container.appendChild(newListObject2);
+        }
         container.appendChild(document.createElement("br"));
     });
 }
