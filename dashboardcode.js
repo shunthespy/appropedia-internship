@@ -234,29 +234,6 @@ function postRecentUsers(){ //recent users and their most recent edit, shallow s
     });
 }
 
-function postRecentUsersDeep(){ //recent user search but deeper, last 5 revisions of page vs one, bots filtered etc.
-    recentUserArrayDeep.sort(function(a,b) {
-        return a[1]-b[1]
-    });
-    recentUserArrayDeep.reverse();
-    let container = document.querySelector('#recentlist')
-    container.innerHTML = ''; //in case of refresh
-    recentUserArrayDeep.forEach(e => {
-        let newListObject = document.createElement("a");
-        let newText = document.createTextNode(e[0]);
-        newListObject.appendChild(newText);
-        newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
-        container.appendChild(newListObject);
-        if (showTimestamps) { //all timestamp related
-            let newListObject2 = document.createElement("a");
-            let newText2 = document.createTextNode(': ' + e[2]);
-            newListObject2.appendChild(newText2);
-            container.appendChild(newListObject2);
-        }
-        container.appendChild(document.createElement("br"));
-    });
-}
-
 function indexOfUser(arr, id){
     // console.log(arr);
     for(let index = 0; index < arr.length; index++){
