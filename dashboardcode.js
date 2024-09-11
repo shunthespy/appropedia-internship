@@ -1,7 +1,8 @@
-// const botIDs = [116268, 119543, 120737, 120901]; 
 const wikiSite = "http://appropedia.org/"; //this is a temporary default and will be removed to make code more open to other sites
 let excludeBots = true; //gonna make this toggleable
 let showTimestamps = true;
+let showPageEditCount = true;
+let showUserPagesEditedCount = true;
 let currentCat = "";
 var continuing = false;
 let continueString = "";
@@ -10,7 +11,6 @@ var userArray = [];
 var minorArray = []; //minor edit array
 var recentArray = [];
 var recentUserArray = [];
-var recentUserArrayDeep = [];
 const revisionCount = 10000;
 var mostRecentRevision = 0;
 
@@ -76,7 +76,6 @@ async function setDisplayTop(){
                     data => {
                         let allPages = data.query.pages;
                         for (let page in allPages) {
-                            // let tempUnique = 0
                             let currentTitle = allPages[page].title
                             let contributors = allPages[page].contributors;
                             if (contributors!=null) {
@@ -92,19 +91,15 @@ async function setDisplayTop(){
                                     }
                                 }
                             }   
-                            //needs to omit edits from bots
                             setEdits(currentTitle);
-                            // setEditsRev(currentTitle, revisionCount);
                             postUsers();
                             postMinors();
                             postRecentUsers();
-                            // postRecentUsersDeep();
                         }; 
                     }).catch(error => {console.error(error);})
                     //get data for revisions
                     fetch(genIDBasedAPILinkRevisions(bar[i])).then(response => response.json()).then(//get data for page
                         data => {
-                            console.log(data);
                             let allPages = data.query.pages;
                             for (let page in allPages) { //not checking uniqueness on users in the 5 revisions
                                 // let tempUnique = 0
@@ -136,13 +131,7 @@ async function setDisplayTop(){
                 currentTimestamp = cleanTimestamp(currentTimestamp);
                 // console.log(currentLastRevUser);
                 let currentTitle = catPages[page].title;
-                if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev, currentTimestamp]);      
-                // if(recentUnique.indexOf(currentLastRevUser) != -1) { //OLD, SHALLOW recent users
-                //     mostRecentEditCheck(currentLastRevUser, currentLastRev, currentTimestamp); //check recency compared to logged revid, then push
-                // } else { // if not already listed as a recent user
-                //     recentUserArray.push([currentLastRevUser, currentLastRev, currentTimestamp]) //push into array no verification
-                //     recentUnique.push(currentLastRevUser);
-                // }
+                if (currentLastRevUser != "Translations bot") minorArray.push([currentTitle, currentLastRevUser, currentLastRev, currentTimestamp]); //should find way to delay & check against users
             }
         }).then(function(){ //recur to continue
             if(continuing) setDisplayTop();
@@ -154,18 +143,8 @@ async function setDisplayTop(){
 }
 
 
-//checks each contributor if bot, will create if needed outside of just checking from contributors
-async function checkBot(user) {
-    
-}
-
 function cleanTimestamp(time){ //both of these clean methods are slightly slower than possible but written clearer than otherwise 
     let newTimestamp = time.substring(0, 10) + " " + time.substring(11, 19);
-    return newTimestamp;
-}
-
-function cleanTimestamptoInt(time){ //this is for int comparison for deep revision checks <may be unneeded, testing>
-    let newTimestamp = time.replace(/\D/g,'');
     return newTimestamp;
 }
 
@@ -175,16 +154,41 @@ function toggleTimestamps(){
     postMinors();
 }
 
+function togglePageEditCount(){
+    showPageEditCount = !showPageEditCount; //flip boolean
+    postEdits();
+}
+
+function toggleUserPagesEditedCount(){
+    showUserPagesEditedCount = !showUserPagesEditedCount; //flip boolean
+    postUsers();
+}
+
+//calls all helper toggle functions
+function toggleExtraData(){
+    toggleTimestamps();
+    togglePageEditCount();
+    toggleUserPagesEditedCount();
+}
+
+//helper function to add toggle function to button
+function addFunctiontoToggleButton(){
+    document.getElementById('toggleData').addEventListener('click', toggleExtraData) //additional instances get discarded, no need to check
+}
+
+//sets name of category in heading & subhead, adds link to subhead
 function setCatName(){
     document.getElementById('category').textContent = "Dashboard for project " + currentCat;
     document.getElementById('subhead').textContent = "(based on Category:" + currentCat  + ")";
     document.getElementById('subhead').href = "https://www.appropedia.org/Category:" + currentCat;
 }
 
+//generic error message function (changes subhead), changes styling & removes link from subhead
 function setErrorMessage(msg){
     document.getElementById('subhead').textContent = msg;
     document.getElementById('subhead').removeAttribute('href');
     document.getElementById('subhead').classList.add("errormessage");
+    document.getElementById('toggleData').classList.add("invisible");
 }
 
 function postMinors(){ //minors being any revision to a page, no filtering for logs
@@ -269,14 +273,16 @@ function postUsers(){ //takes all and puts onto site
     container.innerHTML = ''; //in case of refresh
     userArray.forEach(e => {
         let newListObject = document.createElement("a");
-        let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[1]);
         newListObject.appendChild(newText);
-        newListObject2.appendChild(newText2);
         newListObject.href = wikiSite + 'User:' + encodeURI(e[0]);
         container.appendChild(newListObject);
-        container.appendChild(newListObject2);
+        if (showUserPagesEditedCount) {
+            let newListObject2 = document.createElement("a");
+            let newText2 = document.createTextNode(': ' + e[1]);
+            newListObject2.appendChild(newText2);
+            container.appendChild(newListObject2);
+        }
         container.appendChild(document.createElement("br"));
     });
 }
@@ -304,6 +310,7 @@ async function setEditsRev(page, revs){
 //gets data for page edits (bots can't be filtered out according to documentation, 
 //could potentially do some subtraction by getting bot edits too)
 async function getEdits(page){ 
+    await new Promise(r => setTimeout(r, 200));
     let link = proxy + wikiSite + "w/rest.php/v1/page/" + encodeURIComponent(page) +"/history/counts/edits"
     try {
         var response = await fetch(link, {
@@ -384,14 +391,16 @@ function postEdits(){ //takes all and puts onto site
     container.innerHTML = ''; //in case of refresh
     siteArray.forEach(e => {
         let newListObject = document.createElement("a");
-        let newListObject2 = document.createElement("a");
         let newText = document.createTextNode(e[0]);
-        let newText2 = document.createTextNode(': ' + e[1]);
         newListObject.appendChild(newText);
-        newListObject2.appendChild(newText2);
         newListObject.href = wikiSite + encodeURI(e[0]);
         container.appendChild(newListObject);
-        container.appendChild(newListObject2);
+        if(showPageEditCount) {
+            let newListObject2 = document.createElement("a");
+            let newText2 = document.createTextNode(': ' + e[1]);
+            newListObject2.appendChild(newText2);
+            container.appendChild(newListObject2);
+        }
         container.appendChild(document.createElement("br"));
     });
 }
@@ -407,12 +416,9 @@ function genIDBasedAPILinkRevisions(id){
     return proxy + wikiSite + "w/api.php?action=query&prop=revisions&pageids=" + id + "&rvlimit=5&rvprop=ids|timestamp|user&format=json";
 }
 
-function genNameBasedAPILinkUserRoles(name){    
-    return proxy + wikiSite + "w/api.php?action=query&prop=revisions&pageids=" + name + "&rvlimit=5&rvprop=ids|timestamp|user&format=json";
-}
-
 async function setLinkToInput(){ //sets mainApiLink to inputted category, then dumps info on page
     resetVals();
+    addFunctiontoToggleButton();
     setCatName();
     setLastRevisionID();
     // currentCat = document.getElementById("category").value;
