@@ -1,11 +1,15 @@
 .maingrid {
     display: grid;
     border: 2px solid #181818;  
-    display: grid;
+    border-radius: 16px;
+    overflow: hidden;
     grid-template-columns: 50% 50%;
     grid-auto-rows: 40vh 40vh; /* adjusted for full view with other elements on 16:9, no scroll */
     grid-gap: 1px;
     background-color: #181818;
+    width: min(100%, 92vw);
+    place-content: center;
+    margin-inline: auto;
 }
 
 @media ( max-width: 750px ) { /* mobile view */
@@ -18,6 +22,8 @@
   }
   
 .section {
+    
+    border: 1px solid #181818; 
     background-color: #f8f9fb;
     text-align: center;
     padding-top: 10px;
@@ -26,6 +32,8 @@
 body {  
     font-family: Arial, Helvetica, sans-serif;
     background-color: white;
+    align-items: center;
+    display: grid;
 } 
 .section::-webkit-scrollbar {
     width: 20px;
@@ -53,17 +61,23 @@ body {
 
 #subhead {
     text-align: center;
-    padding: 0;
+    padding: .5em;
     border: 0;
-    margin-top: -2.5vh;
+    margin-bottom: .5em;
     display: block;
+}
+
+h6 { 
+    border: 0;
+    padding: 0;
+    margin: 0;
 }
 
 #toggleData {
     display: block;
      margin-left: auto;
      margin-right: auto;
-     transform: translateY(-2vh);
+     margin-bottom: .25em;
 }
 
 .errormessage{
